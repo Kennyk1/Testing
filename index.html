@@ -1,0 +1,81 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Telesapp - Welcome</title>
+  <style>
+    body {
+      font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+      margin: 0;
+      background: #f5f5f7;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      min-height: 100vh;
+      padding: 20px;
+      color: #333;
+    }
+    .container {
+      max-width: 480px;
+      text-align: center;
+      background: white;
+      padding: 40px 30px;
+      border-radius: 12px;
+      box-shadow: 0 8px 20px rgba(0,0,0,0.1);
+    }
+    h1 {
+      font-size: 2.5rem;
+      margin-bottom: 16px;
+      color: #075e54; /* WhatsApp green-ish */
+    }
+    p.welcome-msg {
+      font-size: 1.2rem;
+      margin-bottom: 32px;
+      color: #444;
+    }
+    button.get-started {
+      background-color: #d93025; /* red */
+      color: white;
+      border: none;
+      padding: 14px 40px;
+      font-size: 1.1rem;
+      border-radius: 30px;
+      cursor: pointer;
+      transition: background-color 0.3s ease;
+      box-shadow: 0 4px 10px rgba(217, 48, 37, 0.4);
+    }
+    button.get-started:hover {
+      background-color: #b1271b;
+    }
+    .reviews {
+      margin-top: 40px;
+      text-align: left;
+    }
+    .review {
+      background: #e9f5ff;
+      border-left: 5px solid #2196f3;
+      padding: 15px 20px;
+      margin-bottom: 15px;
+      border-radius: 8px;
+      font-style: italic;
+      color: #333;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h1>Welcome to Telesapp</h1>
+    <p class="welcome-msg">Chat with your friends now — simple, fast, and secure.</p>
+    <button class="get-started" onclick="location.href='login.html'">Get Started</button>
+
+    <div class="reviews">
+      <div class="review">"Telesapp is way cooler and faster than any chat app I've used!" - Alex</div>
+      <div class="review">"The UI is sleek and easy to use. Love it!" - Maria</div>
+      <div class="review">"Finally a chat app that feels modern and smooth." - Jamal</div>
+    </div>
+  </div>
+</body>
+  </html>
+  
