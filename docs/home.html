@@ -1,0 +1,229 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Telesapp - Home</title>
+  <style>
+    body, html {
+      margin: 0; padding: 0; height: 100%;
+      font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+      background: #f9fafb;
+      display: flex;
+      flex-direction: column;
+      height: 100vh;
+      color: #222;
+    }
+    header {
+      background-color: #075e54;
+      color: white;
+      padding: 15px 25px;
+      font-size: 1.5rem;
+      font-weight: 700;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      box-shadow: 0 2px 6px rgba(0,0,0,0.15);
+    }
+    #container {
+      display: flex;
+      flex-grow: 1;
+      overflow: hidden;
+    }
+    #contacts {
+      width: 280px;
+      background: white;
+      border-right: 1px solid #ddd;
+      display: flex;
+      flex-direction: column;
+    }
+    #contacts header {
+      padding: 20px;
+      font-weight: 600;
+      border-bottom: 1px solid #ddd;
+      font-size: 1.2rem;
+      color: #075e54;
+    }
+    .contact {
+      padding: 15px 20px;
+      border-bottom: 1px solid #eee;
+      cursor: pointer;
+      transition: background-color 0.2s ease;
+    }
+    .contact:hover, .contact.active {
+      background-color: #d4f0e4;
+    }
+
+    #chat {
+      flex-grow: 1;
+      display: flex;
+      flex-direction: column;
+      background: white;
+    }
+    #chat-header {
+      padding: 15px 20px;
+      border-bottom: 1px solid #ddd;
+      font-weight: 600;
+      color: #075e54;
+      font-size: 1.3rem;
+      background: #f0fdf9;
+    }
+    #messages {
+      flex-grow: 1;
+      padding: 20px;
+      overflow-y: auto;
+      background: #e6f2f1;
+    }
+    .message {
+      max-width: 70%;
+      margin-bottom: 15px;
+      padding: 12px 18px;
+      border-radius: 20px;
+      font-size: 1rem;
+      line-height: 1.3;
+      word-wrap: break-word;
+      box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+    }
+    .message.sent {
+      background-color: #dcf8c6;
+      align-self: flex-end;
+      border-bottom-right-radius: 4px;
+    }
+    .message.received {
+      background-color: white;
+      align-self: flex-start;
+      border-bottom-left-radius: 4px;
+    }
+    #input-area {
+      padding: 15px 20px;
+      border-top: 1px solid #ddd;
+      background: #f9f9f9;
+      display: flex;
+      gap: 12px;
+    }
+    #message-input {
+      flex-grow: 1;
+      padding: 12px 16px;
+      border-radius: 30px;
+      border: 1.8px solid #ccc;
+      font-size: 1rem;
+      outline: none;
+      transition: border-color 0.3s ease;
+    }
+    #message-input:focus {
+      border-color: #075e54;
+    }
+    #send-btn {
+      background-color: #d93025;
+      border: none;
+      color: white;
+      padding: 12px 25px;
+      border-radius: 30px;
+      font-weight: 700;
+      cursor: pointer;
+      box-shadow: 0 5px 12px rgba(217, 48, 37, 0.6);
+      transition: background-color 0.3s ease;
+    }
+    #send-btn:hover {
+      background-color: #b1271b;
+    }
+  </style>
+</head>
+<body>
+  <header>
+    Telesapp
+    <div id="user-info">Logged in as <strong>User</strong></div>
+  </header>
+
+  <div id="container">
+    <aside id="contacts">
+      <header>Contacts</header>
+      <div class="contact active" data-id="friend1">Alice</div>
+      <div class="contact" data-id="friend2">Bob</div>
+      <div class="contact" data-id="friend3">Charlie</div>
+    </aside>
+
+    <section id="chat">
+      <div id="chat-header">Alice</div>
+      <div id="messages"></div>
+      <form id="input-area">
+        <input type="text" id="message-input" placeholder="Type a message..." autocomplete="off" required />
+        <button type="submit" id="send-btn">Send</button>
+      </form>
+    </section>
+  </div>
+
+  <script>
+    const contacts = document.querySelectorAll('.contact');
+    const chatHeader = document.getElementById('chat-header');
+    const messagesContainer = document.getElementById('messages');
+    const messageInput = document.getElementById('message-input');
+    const inputForm = document.getElementById('input-area');
+
+    let currentChatId = 'friend1'; // default chat
+
+    // Load messages from localStorage by chat ID
+    function loadMessages(chatId) {
+      messagesContainer.innerHTML = '';
+      const messages = JSON.parse(localStorage.getItem(chatId)) || [];
+      messages.forEach(msg => {
+        const msgDiv = document.createElement('div');
+        msgDiv.classList.add('message');
+        msgDiv.classList.add(msg.sender === 'me' ? 'sent' : 'received');
+        msgDiv.textContent = msg.text;
+        messagesContainer.appendChild(msgDiv);
+      });
+      messagesContainer.scrollTop = messagesContainer.scrollHeight;
+    }
+
+    // Save message to localStorage
+    function saveMessage(chatId, message) {
+      const messages = JSON.parse(localStorage.getItem(chatId)) || [];
+      messages.push(message);
+      localStorage.setItem(chatId, JSON.stringify(messages));
+    }
+
+    // Switch chat when clicking contact
+    contacts.forEach(contact => {
+      contact.addEventListener('click', () => {
+        contacts.forEach(c => c.classList.remove('active'));
+        contact.classList.add('active');
+        currentChatId = contact.dataset.id;
+        chatHeader.textContent = contact.textContent;
+        loadMessages(currentChatId);
+      });
+    });
+
+    // Handle sending message
+    inputForm.addEventListener('submit', e => {
+      e.preventDefault();
+      const text = messageInput.value.trim();
+      if (!text) return;
+
+      const message = {
+        sender: 'me',
+        text,
+        timestamp: Date.now()
+      };
+
+      saveMessage(currentChatId, message);
+      loadMessages(currentChatId);
+      messageInput.value = '';
+
+      // Simulate friend reply after 1.5 seconds (optional)
+      setTimeout(() => {
+        const reply = {
+          sender: 'friend',
+          text: 'Got your message: "' + text + '"',
+          timestamp: Date.now()
+        };
+        saveMessage(currentChatId, reply);
+        loadMessages(currentChatId);
+      }, 1500);
+    });
+
+    // Initial load
+    loadMessages(currentChatId);
+  </script>
+</body>
+</html>
