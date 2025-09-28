@@ -1,0 +1,86 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Telesapp - Contacts</title>
+  <style>
+    body { margin:0; font-family:Arial, sans-serif; background:#121212; color:#ccc; height:100vh; display:flex; flex-direction:column; }
+    header { background:#1f1f1f; padding:12px; display:flex; align-items:center; }
+    header .logo { font-weight:bold; color:#00bfff; font-size:1.2rem; }
+    main { flex:1; overflow-y:auto; padding:10px; }
+    .contact { padding:12px; background:#1f1f1f; margin-bottom:8px; border-radius:8px; cursor:pointer; }
+    .contact:hover { background:#2a2a2a; }
+    .floating-btn { position:fixed; bottom:25px; right:25px; background:#e53935; color:#fff; border-radius:50%; width:56px; height:56px; font-size:36px; line-height:56px; text-align:center; cursor:pointer; }
+  </style>
+</head>
+<body>
+  <header><div class="logo">Telesapp</div></header>
+  <main id="contactsList">
+    <p style="text-align:center;color:#888;">No contacts yet. Add one with +</p>
+  </main>
+  <div class="floating-btn" onclick="newContact()">+</div>
+
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script>
+    const supabase = window.supabase.createClient(
+      "https://tbbjcxahtnojcuxwevkm.supabase.co",
+      "YOUR_ANON_KEY"
+    );
+
+    let sessionUser = null;
+
+    async function getSession() {
+      const { data: { session } } = await supabase.auth.getSession();
+      sessionUser = session?.user;
+      if (!sessionUser) window.location.href = "login.html";
+    }
+
+    async function loadContacts() {
+      const { data, error } = await supabase
+        .from("contacts")
+        .select("contact, profiles!contacts_contact_fkey(full_name)")
+        .eq("owner", sessionUser.id);
+
+      const list = document.getElementById("contactsList");
+      list.innerHTML = "";
+      if (!data || data.length === 0) {
+        list.innerHTML = "<p style='text-align:center;color:#888;'>No contacts yet</p>";
+        return;
+      }
+      data.forEach(c => {
+        const div = document.createElement("div");
+        div.className = "contact";
+        div.textContent = c.profiles.full_name || "Unnamed User";
+        div.onclick = () => window.location.href = `chat.html?contactId=${c.contact}`;
+        list.appendChild(div);
+      });
+    }
+
+    async function newContact() {
+      const email = prompt("Enter user email:");
+      if (!email) return;
+
+      // find user by email
+      const { data: profile } = await supabase.from("profiles").select("id").eq("email", email).single();
+      if (!profile) {
+        alert("User not in Telesapp.");
+        return;
+      }
+
+      // insert into contacts
+      await supabase.from("contacts").insert({
+        owner: sessionUser.id,
+        contact: profile.id
+      });
+
+      loadContacts();
+    }
+
+    (async () => {
+      await getSession();
+      loadContacts();
+    })();
+  </script>
+</body>
+</html>
