@@ -1,0 +1,226 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Telesapp - Chat</title>
+  <style>
+    body {
+      margin:0; font-family:Arial, sans-serif;
+      background:#0b141a; color:#e9edef;
+      height:100vh; display:flex; flex-direction:column;
+    }
+    header {
+      background:#202c33; padding:10px;
+      display:flex; align-items:center; justify-content:space-between;
+      color:#fff;
+    }
+    .chat-info {
+      display:flex; align-items:center;
+    }
+    .chat-info img {
+      width:40px; height:40px; border-radius:50%; margin-right:10px;
+    }
+    .chat-info .name {
+      font-weight:bold; font-size:16px;
+    }
+    .chat-actions button {
+      background:none; border:none; color:#00bfff;
+      font-size:18px; margin-left:10px; cursor:pointer;
+    }
+    main {
+      flex:1; padding:10px; overflow-y:auto;
+      background:url("https://i.ibb.co/YLQZCBJ/chat-bg.png");
+    }
+    .msg {
+      margin:6px 0; padding:8px 10px;
+      border-radius:8px; max-width:75%; position:relative;
+      word-wrap:break-word; font-size:14px;
+    }
+    .sent {
+      background:#005c4b; color:#fff;
+      margin-left:auto; border-bottom-right-radius:0;
+    }
+    .recv {
+      background:#202c33; color:#fff;
+      margin-right:auto; border-bottom-left-radius:0;
+    }
+    .timestamp {
+      font-size:11px; opacity:0.7; margin-top:4px; text-align:right;
+    }
+    form {
+      display:flex; padding:10px; background:#202c33;
+    }
+    input {
+      flex:1; padding:10px; border:none; border-radius:20px;
+      margin-right:8px; background:#2a3942; color:#fff;
+    }
+    button {
+      padding:10px 15px; border:none;
+      background:#00bfff; color:#fff; border-radius:50%;
+      font-size:16px; cursor:pointer;
+    }
+    /* Context menu */
+    #contextMenu {
+      position:absolute; display:none; background:#2a3942;
+      border-radius:6px; overflow:hidden; box-shadow:0 2px 6px rgba(0,0,0,0.3);
+      z-index:1000;
+    }
+    #contextMenu div {
+      padding:10px 15px; cursor:pointer;
+    }
+    #contextMenu div:hover {
+      background:#3b4a54;
+    }
+  </style>
+</head>
+<body>
+  <header>
+    <div class="chat-info">
+      <img id="chatAvatar" src="https://i.ibb.co/2YqzWcV/avatar.png" alt="avatar">
+      <div class="name" id="chatTitle">Chat</div>
+    </div>
+    <div class="chat-actions">
+      <button title="Voice Call">📞</button>
+      <button title="Video Call">📹</button>
+    </div>
+  </header>
+
+  <main id="chatBox"></main>
+
+  <form id="chatForm">
+    <input id="msgInput" placeholder="Type a message..." required />
+    <button>➤</button>
+  </form>
+
+  <div id="contextMenu">
+    <div onclick="deleteMsg()">Delete</div>
+    <div onclick="editMsg()">Edit</div>
+    <div onclick="infoMsg()">Info</div>
+  </div>
+
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script>
+    const supabase = window.supabase.createClient(
+      "https://tbbjcxahtnojcuxwevkm.supabase.co",
+      "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InRiYmpjeGFodG5vamN1eHdldmttIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTg5ODA0MjMsImV4cCI6MjA3NDU1NjQyM30.mNp1Jj7PNiGXNC1WJDGaaUpJW2C0P7AqnLt3DlGhxqs"
+    );
+
+    let sessionUser = null;
+    let selectedMsg = null; // for context menu
+    const params = new URLSearchParams(window.location.search);
+    const contactId = params.get("contactId");
+
+    async function getSession() {
+      const { data: { session } } = await supabase.auth.getSession();
+      sessionUser = session?.user;
+      if (!sessionUser) window.location.href = "login.html";
+
+      // Load contact info
+      const { data: profile } = await supabase.from("profiles").select("full_name, avatar_url").eq("id", contactId).single();
+      document.getElementById("chatTitle").textContent = profile?.full_name || "Chat";
+      if (profile?.avatar_url) document.getElementById("chatAvatar").src = profile.avatar_url;
+    }
+
+    function formatTime(ts) {
+      const d = new Date(ts);
+      return d.toLocaleTimeString([], {hour:"2-digit", minute:"2-digit"});
+    }
+
+    async function loadMessages() {
+      const { data } = await supabase
+        .from("messages")
+        .select("*")
+        .or(`and(sender_id.eq.${sessionUser.id},receiver_id.eq.${contactId}),and(sender_id.eq.${contactId},receiver_id.eq.${sessionUser.id})`)
+        .order("created_at", { ascending: true });
+
+      const box = document.getElementById("chatBox");
+      box.innerHTML = "";
+      data.forEach(m => {
+        const div = document.createElement("div");
+        div.className = "msg " + (m.sender_id === sessionUser.id ? "sent" : "recv");
+        div.innerHTML = `
+          <div>${m.body}</div>
+          <div class="timestamp">${formatTime(m.created_at)}</div>
+        `;
+        div.dataset.id = m.id;
+        div.oncontextmenu = (e) => {
+          e.preventDefault();
+          selectedMsg = m;
+          showContextMenu(e.pageX, e.pageY);
+        };
+        box.appendChild(div);
+      });
+      box.scrollTop = box.scrollHeight;
+    }
+
+    document.getElementById("chatForm").addEventListener("submit", async (e) => {
+      e.preventDefault();
+      const msg = document.getElementById("msgInput").value.trim();
+      if (!msg) return;
+      await supabase.from("messages").insert({
+        sender_id: sessionUser.id,
+        receiver_id: contactId,
+        body: msg
+      });
+      document.getElementById("msgInput").value = "";
+    });
+
+    function subscribeRealtime() {
+      supabase
+        .channel("chat")
+        .on("postgres_changes", { event: "INSERT", schema: "public", table: "messages" }, payload => {
+          const m = payload.new;
+          if ((m.sender_id === sessionUser.id && m.receiver_id === contactId) ||
+              (m.sender_id === contactId && m.receiver_id === sessionUser.id)) {
+            loadMessages();
+          }
+        }).subscribe();
+    }
+
+    // Context Menu Functions
+    function showContextMenu(x, y) {
+      const menu = document.getElementById("contextMenu");
+      menu.style.left = x + "px";
+      menu.style.top = y + "px";
+      menu.style.display = "block";
+    }
+    function hideContextMenu() {
+      document.getElementById("contextMenu").style.display = "none";
+    }
+    window.onclick = hideContextMenu;
+
+    function deleteMsg() {
+      if (selectedMsg) {
+        const el = document.querySelector(`[data-id="${selectedMsg.id}"]`);
+        if (el) el.remove(); // frontend only
+      }
+      hideContextMenu();
+    }
+    function editMsg() {
+      if (selectedMsg) {
+        const newText = prompt("Edit message:", selectedMsg.body);
+        if (newText) {
+          const el = document.querySelector(`[data-id="${selectedMsg.id}"]`);
+          if (el) {
+            el.querySelector("div").textContent = newText + " (edited)";
+          }
+        }
+      }
+      hideContextMenu();
+    }
+    function infoMsg() {
+      if (selectedMsg) {
+        alert("Sent at: " + formatTime(selectedMsg.created_at));
+      }
+      hideContextMenu();
+    }
+
+    (async () => {
+      await getSession();
+      loadMessages();
+      subscribeRealtime();
+    })();
+  </script>
+</body>
+    </html>
