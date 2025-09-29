@@ -1,0 +1,771 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Telesapp - Chat</title>
+  <style>
+    body {
+      margin:0; font-family:Arial, sans-serif;
+      background:#0b141a; color:#e9edef;
+      height:100vh; display:flex; flex-direction:column;
+      overflow: hidden;
+    }
+    header {
+      background:#202c33; padding:10px 12px;
+      display:flex; align-items:center; justify-content:space-between;
+      color:#fff;
+      position: sticky;
+      top: 0;
+      z-index: 100;
+    }
+    .chat-info {
+      display:flex; align-items:center; cursor: pointer;
+      flex: 1;
+      min-width: 0;
+    }
+    .chat-info img {
+      width:40px; height:40px; border-radius:50%; margin-right:10px;
+      object-fit: cover;
+      background:#2a3942;
+    }
+    .chat-info .name {
+      font-weight:bold; font-size:16px;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+    .chat-info .last-seen {
+      font-size: 12px;
+      opacity: 0.7;
+      margin-left: 10px;
+      white-space: nowrap;
+    }
+    .chat-actions button {
+      background:none; border:none; color:#00bfff;
+      font-size:22px; margin-left:10px; cursor:pointer;
+      user-select:none;
+    }
+    .chat-actions button:hover {
+      color:#33cfff;
+    }
+    /* Three dots menu */
+    #menuBtn {
+      background:none; border:none; color:#e9edef;
+      font-size:24px; margin-left:10px; cursor:pointer;
+      user-select:none;
+      position: relative;
+    }
+    #menuDropdown {
+      display:none;
+      position: absolute;
+      right: 0;
+      top: 36px;
+      background:#2a3942;
+      border-radius:6px;
+      box-shadow:0 2px 6px rgba(0,0,0,0.3);
+      overflow:hidden;
+      min-width: 180px;
+      z-index: 200;
+    }
+    #menuDropdown div {
+      padding:10px 15px;
+      cursor:pointer;
+      color:#e9edef;
+      white-space: nowrap;
+      user-select:none;
+    }
+    #menuDropdown div:hover {
+      background:#3b4a54;
+    }
+
+    main {
+      flex:1; padding:10px;
+      overflow-y:auto;
+      background:url("https://h.uguu.se/oZZLcuTZ.jpg");
+      scroll-behavior: smooth;
+    }
+    .msg {
+      margin:6px 0; padding:8px 10px;
+      border-radius:8px; max-width:75%; position:relative;
+      word-wrap:break-word; font-size:14px;
+      line-height: 1.3;
+    }
+    .sent {
+      background:#005c4b; color:#fff;
+      margin-left:auto; border-bottom-right-radius:0;
+    }
+    .recv {
+      background:#202c33; color:#fff;
+      margin-right:auto; border-bottom-left-radius:0;
+    }
+    .timestamp {
+      font-size:11px; opacity:0.7; margin-top:4px; text-align:right;
+    }
+    form {
+      display:flex; padding:10px; background:#202c33;
+      position: sticky;
+      bottom: 0;
+      z-index: 100;
+      align-items: center;
+    }
+    input#msgInput {
+      flex:1; padding:10px 15px; border:none; border-radius:20px;
+      margin: 0 8px 0 4px; background:#2a3942; color:#fff;
+      font-size: 15px;
+    }
+    button.sendBtn {
+      padding:10px 15px; border:none;
+      background:#00bfff; color:#fff; border-radius:50%;
+      font-size:18px; cursor:pointer;
+      user-select:none;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+    button.sendBtn:disabled {
+      background:#4a8ea9;
+      cursor: not-allowed;
+    }
+    /* Icons next to input */
+    button.iconBtn {
+      background:none; border:none; color:#00bfff;
+      font-size:22px; cursor:pointer;
+      user-select:none;
+      margin-left: 4px;
+    }
+    button.iconBtn:hover {
+      color:#33cfff;
+    }
+    /* Scroll down arrow */
+    #scrollDownBtn {
+      position: fixed;
+      bottom: 80px;
+      right: 20px;
+      background:#00bfff;
+      border:none;
+      border-radius: 50%;
+      width: 40px; height: 40px;
+      font-size: 24px;
+      color: white;
+      cursor: pointer;
+      display: none;
+      z-index: 150;
+      user-select:none;
+      box-shadow: 0 2px 6px rgba(0,0,0,0.3);
+    }
+    #scrollDownBtn:hover {
+      background:#33cfff;
+    }
+    /* Context menu */
+    #contextMenu {
+      position:absolute; display:none; background:#2a3942;
+      border-radius:6px; overflow:hidden; box-shadow:0 2px 6px rgba(0,0,0,0.3);
+      z-index:1000;
+      user-select:none;
+    }
+    #contextMenu div {
+      padding:10px 15px; cursor:pointer;
+      color:#e9edef;
+    }
+    #contextMenu div:hover {
+      background:#3b4a54;
+    }
+    .ticks {
+      margin-left: 6px;
+      font-weight: bold;
+      color: gray;
+    }
+    .ticks.seen {
+      color: #00aaff; /* blue ticks */
+    }
+
+    /* Modal for View Contact */
+    #viewContactModal {
+      position: fixed;
+      top:0; left:0; right:0; bottom:0;
+      background: rgba(0,0,0,0.7);
+      display:none;
+      align-items: center;
+      justify-content: center;
+      z-index: 300;
+    }
+    #viewContactContent {
+      background: #202c33;
+      border-radius: 10px;
+      width: 320px;
+      max-width: 90vw;
+      padding: 20px;
+      color: #e9edef;
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+      position: relative;
+    }
+    #viewContactContent h2 {
+      margin: 0 0 6px 0;
+      font-weight: bold;
+      font-size: 22px;
+    }
+    #viewContactContent img {
+      width: 80px;
+      height: 80px;
+      border-radius: 50%;
+      object-fit: cover;
+      background:#2a3942;
+      margin-bottom: 10px;
+      align-self: center;
+    }
+    #viewContactContent label {
+      font-weight: 600;
+      font-size: 13px;
+      margin-bottom: 2px;
+      opacity: 0.7;
+    }
+    #viewContactContent .info-row {
+      display: flex;
+      flex-direction: column;
+    }
+    #viewContactContent input[type="text"], #viewContactContent textarea {
+      background: #2a3942;
+      border: none;
+      border-radius: 6px;
+      color: #e9edef;
+      padding: 8px;
+      font-size: 14px;
+      resize: vertical;
+      min-height: 40px;
+    }
+    #viewContactContent textarea {
+      min-height: 60px;
+      max-height: 120px;
+    }
+    #viewContactContent .toggle-row {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-top: 8px;
+    }
+    #viewContactContent .toggle-row label {
+      font-weight: normal;
+      opacity: 1;
+      font-size: 15px;
+    }
+    .switch {
+      position: relative;
+      display: inline-block;
+      width: 46px;
+      height: 24px;
+    }
+    .switch input {
+      opacity: 0;
+      width: 0;
+      height: 0;
+    }
+    .slider {
+      position: absolute;
+      cursor: pointer;
+      top: 0; left: 0; right: 0; bottom: 0;
+      background-color: #ccc;
+      transition: 0.4s;
+      border-radius: 24px;
+    }
+    .slider:before {
+      position: absolute;
+      content: "";
+      height: 18px;
+      width: 18px;
+      left: 3px;
+      bottom: 3px;
+      background-color: white;
+      transition: 0.4s;
+      border-radius: 50%;
+    }
+    input:checked + .slider {
+      background-color: #00bfff;
+    }
+    input:checked + .slider:before {
+      transform: translateX(22px);
+    }
+    #viewContactClose {
+      position: absolute;
+      top: 8px;
+      right: 12px;
+      font-size: 24px;
+      color: #e9edef;
+      cursor: pointer;
+      user-select:none;
+    }
+  </style>
+</head>
+<body>
+  <header>
+    <div class="chat-info" id="chatInfo">
+      <img id="chatAvatar" src="https://h.uguu.se/oZZLcuTZ.jpg" alt="avatar" />
+      <div style="min-width:0;">
+        <div class="name" id="chatTitle">Chat</div>
+        <div class="last-seen" id="lastSeen">Last seen: --</div>
+      </div>
+    </div>
+    <div class="chat-actions">
+      <button title="Video Call" id="videoCallBtn">📹</button>
+      <button title="Voice Call" id="voiceCallBtn">📞</button>
+      <button title="Menu" id="menuBtn">⋮</button>
+      <div id="menuDropdown">
+        <div id="viewContactOption">View Contact</div>
+        <div id="blockUserOption">
+          <label style="display:flex; justify-content:space-between; align-items:center; cursor:pointer;">
+            Block User
+            <input type="checkbox" id="blockUserToggle" />
+          </label>
+        </div>
+        <div id="reportUserOption">Report User</div>
+        <div id="goFirstMsgOption">Go to First Message</div>
+        <div id="goLastMsgOption">Go to Last Message</div>
+      </div>
+    </div>
+  </header>
+
+  <main id="chatBox"></main>
+
+  <button id="scrollDownBtn" title="Scroll to latest">⬇</button>
+
+  <form id="chatForm" autocomplete="off">
+    <button type="button" class="iconBtn" id="emojiBtn" title="Emoji">😊</button>
+    <input id="msgInput" placeholder="Type a message..." required autocomplete="off" />
+    <button type="button" class="iconBtn" id="attachBtn" title="Attach">📎</button>
+    <button type="button" class="iconBtn" id="cameraBtn" title="Camera">📷</button>
+    <button type="button" class="iconBtn" id="micBtn" title="Microphone">🎤</button>
+    <button type="submit" class="sendBtn" title="Send">➤</button>
+  </form>
+
+  <div id="contextMenu">
+    <div onclick="deleteMsg()">Delete</div>
+    <div onclick="editMsg()">Edit</div>
+    <div onclick="infoMsg()">Info</div>
+  </div>
+
+  <!-- View Contact Modal -->
+  <div id="viewContactModal">
+    <div id="viewContactContent">
+      <div id="viewContactClose">&times;</div>
+      <img id="viewContactAvatar" src="https://h.uguu.se/oZZLcuTZ.jpg" alt="avatar"/>
+      <h2 id="viewContactName">Contact Name</h2>
+      <div class="info-row">
+        <label>Phone Number</label>
+        <div id="viewContactPhone" style="user-select: text;">+000 000 000 0000</div>
+      </div>
+      <div class="info-row">
+        <label>Bio</label>
+        <textarea id="viewContactBio" placeholder="Add a bio..."></textarea>
+      </div>
+      <div class="info-row">
+        <label>Last Seen</label>
+        <div id="viewContactLastSeen">--</div>
+      </div>
+      <div class="toggle-row">
+        <label for="blockToggleModal">Block User</label>
+        <label class="switch">
+          <input type="checkbox" id="blockToggleModal" />
+          <span class="slider"></span>
+        </label>
+      </div>
+      <div class="toggle-row">
+        <label for="securityToggleModal">Security (End-to-End Encryption)</label>
+        <label class="switch">
+          <input type="checkbox" id="securityToggleModal" />
+          <span class="slider"></span>
+        </label>
+      </div>
+    </div>
+  </div>
+
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script>
+    const supabase = window.supabase.createClient(
+      "https://tbbjcxahtnojcuxwevkm.supabase.co",
+      "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InRiYmpjeGFodG5vamN1eHdldmttIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTg5ODA0MjMsImV4cCI6MjA3NDU1NjQyM30.mNp1Jj7PNiGXNC1WJDGaaUpJW2C0P7AqnLt3DlGhxqs"
+    );
+
+    let sessionUser = null;
+    let selectedMsg = null; // for context menu
+    const params = new URLSearchParams(window.location.search);
+    const contactId = params.get("contactId");
+
+    // Elements
+    const chatBox = document.getElementById("chatBox");
+    const scrollDownBtn = document.getElementById("scrollDownBtn");
+    const menuBtn = document.getElementById("menuBtn");
+    const menuDropdown = document.getElementById("menuDropdown");
+    const blockUserToggle = document.getElementById("blockUserToggle");
+    const viewContactModal = document.getElementById("viewContactModal");
+    const viewContactClose = document.getElementById("viewContactClose");
+    const viewContactOption = document.getElementById("viewContactOption");
+    const blockToggleModal = document.getElementById("blockToggleModal");
+    const securityToggleModal = document.getElementById("securityToggleModal");
+    const reportUserOption = document.getElementById("reportUserOption");
+    const goFirstMsgOption = document.getElementById("goFirstMsgOption");
+    const goLastMsgOption = document.getElementById("goLastMsgOption");
+    const chatTitle = document.getElementById("chatTitle");
+    const chatAvatar = document.getElementById("chatAvatar");
+    const lastSeenText = document.getElementById("lastSeen");
+    const viewContactName = document.getElementById("viewContactName");
+    const viewContactAvatar = document.getElementById("viewContactAvatar");
+    const viewContactPhone = document.getElementById("viewContactPhone");
+    const viewContactBio = document.getElementById("viewContactBio");
+    const viewContactLastSeen = document.getElementById("viewContactLastSeen");
+
+    // Call and mic buttons
+    document.getElementById("videoCallBtn").addEventListener("click", () => alert("Video call coming soon"));
+    document.getElementById("voiceCallBtn").addEventListener("click", () => alert("Voice call coming soon"));
+    document.getElementById("micBtn").addEventListener("click", () => alert("Voice message coming soon"));
+    document.getElementById("cameraBtn").addEventListener("click", () => alert("Camera coming soon"));
+    document.getElementById("attachBtn").addEventListener("click", () => alert("Attach files coming soon"));
+    document.getElementById("emojiBtn").addEventListener("click", () => alert("Emoji picker coming soon"));
+
+    // Toggle menu dropdown
+    menuBtn.addEventListener("click", e => {
+      e.stopPropagation();
+      menuDropdown.style.display = menuDropdown.style.display === "block" ? "none" : "block";
+    });
+    window.addEventListener("click", () => {
+      menuDropdown.style.display = "none";
+    });
+
+    // Show View Contact modal
+    viewContactOption.addEventListener("click", () => {
+      menuDropdown.style.display = "none";
+      openViewContactModal();
+    });
+
+    // Report user
+    reportUserOption.addEventListener("click", () => {
+      menuDropdown.style.display = "none";
+      const reason = prompt("Please enter a reason for reporting this user:");
+      if (reason && reason.trim()) {
+        reportUser(reason.trim());
+      }
+    });
+
+    // Go to first message
+    goFirstMsgOption.addEventListener("click", () => {
+      menuDropdown.style.display = "none";
+      if (chatBox.firstChild) {
+        chatBox.scrollTop = 0;
+      }
+    });
+
+    // Go to last message
+    goLastMsgOption.addEventListener("click", () => {
+      menuDropdown.style.display = "none";
+      scrollToBottom();
+    });
+
+    // Block user toggle in menu
+    blockUserToggle.addEventListener("change", async () => {
+      await setBlockStatus(blockUserToggle.checked);
+      // sync modal toggle
+      blockToggleModal.checked = blockUserToggle.checked;
+    });
+
+    // Block user toggle in modal
+    blockToggleModal.addEventListener("change", async () => {
+      await setBlockStatus(blockToggleModal.checked);
+      // sync menu toggle
+      blockUserToggle.checked = blockToggleModal.checked;
+    });
+
+    // Security toggle in modal
+    securityToggleModal.addEventListener("change", () => {
+      if (securityToggleModal.checked) {
+        alert("End-to-end encryption enabled");
+      } else {
+        alert("End-to-end encryption disabled");
+      }
+    });
+
+    // Close modal
+    viewContactClose.addEventListener("click", () => {
+      viewContactModal.style.display = "none";
+    });
+    viewContactModal.addEventListener("click", e => {
+      if (e.target === viewContactModal) {
+        viewContactModal.style.display = "none";
+      }
+    });
+
+    // Save bio on blur
+    viewContactBio.addEventListener("blur", async () => {
+      const newBio = viewContactBio.value.trim();
+      await supabase.from("profiles").update({ bio: newBio }).eq("id", contactId);
+    });
+
+    // Scroll down button
+    scrollDownBtn.addEventListener("click", scrollToBottom);
+
+    // Show/hide scroll down button on scroll
+    chatBox.addEventListener("scroll", () => {
+      const nearBottom = chatBox.scrollHeight - chatBox.scrollTop - chatBox.clientHeight < 50;
+      scrollDownBtn.style.display = nearBottom ? "none" : "block";
+    });
+
+    // Scroll to bottom helper
+    function scrollToBottom() {
+      chatBox.scrollTop = chatBox.scrollHeight;
+    }
+
+    // Escape HTML helper
+    function escapeHTML(str) {
+      return str.replace(/[&<>'"]/g, tag =>
+        ({
+          '&':'&amp;',
+          '<':'&lt;',
+          '>':'&gt;',
+          '"':'&quot;',
+          "'":'&#39;'
+        }[tag])
+      );
+    }
+
+    // Format time helper
+    function formatTime(ts) {
+      const d = new Date(ts);
+      return d.toLocaleTimeString([], {hour:"2-digit", minute:"2-digit"});
+    }
+
+    // Load session and contact info
+    async function getSession() {
+      const { data: { session } } = await supabase.auth.getSession();
+      sessionUser = session?.user;
+      if (!sessionUser) window.location.href = "login.html";
+
+      // Load contact profile
+      const { data: profile, error } = await supabase
+        .from("profiles")
+        .select("full_name, avatar_url, bio, last_seen, security_enabled")
+        .eq("id", contactId)
+        .single();
+
+      chatTitle.textContent = profile?.full_name || "Chat";
+      viewContactName.textContent = profile?.full_name || "Unknown";
+      if (profile?.avatar_url) {
+        chatAvatar.src = profile.avatar_url;
+        viewContactAvatar.src = profile.avatar_url;
+      }
+      viewContactBio.value = profile?.bio || "";
+      viewContactLastSeen.textContent = profile?.last_seen
+        ? new Date(profile.last_seen).toLocaleString()
+        : "Last seen unavailable";
+      lastSeenText.textContent = profile?.last_seen
+        ? "Last seen: " + new Date(profile.last_seen).toLocaleTimeString([], {hour:"2-digit",minute:"2-digit"})
+        : "Last seen: unavailable";
+      securityToggleModal.checked = profile?.security_enabled || false;
+
+      // Load contact phone number from contacts table
+      const { data: contactData } = await supabase
+        .from("contacts")
+        .select("phone")
+        .eq("contact_id", contactId)
+        .single();
+      viewContactPhone.textContent = contactData?.phone || "+000 000 000 0000";
+
+      // Load block status
+      const { data: contactBlock } = await supabase
+        .from("contacts")
+        .select("blocked")
+        .eq("owner_id", sessionUser.id)
+        .eq("contact_id", contactId)
+        .single();
+      const blocked = contactBlock?.blocked || false;
+      blockUserToggle.checked = blocked;
+      blockToggleModal.checked = blocked;
+    }
+
+    // Load messages
+    async function loadMessages() {
+      const { data } = await supabase
+        .from("messages")
+        .select("*")
+        .or(`and(sender_id.eq.${sessionUser.id},receiver_id.eq.${contactId}),and(sender_id.eq.${contactId},receiver_id.eq.${sessionUser.id})`)
+        .order("created_at", { ascending: true });
+
+      chatBox.innerHTML = "";
+
+      data.forEach(m => {
+        const div = document.createElement("div");
+        div.className = "msg " + (m.sender_id === sessionUser.id ? "sent" : "recv");
+
+        let ticks = "";
+        if (m.sender_id === sessionUser.id) {
+          if (m.seen_at) {
+            ticks = '<span class="ticks seen">✓✓</span>'; // blue ticks
+          } else if (m.delivered) {
+            ticks = '<span class="ticks">✓✓</span>'; // gray ticks
+          } else {
+            ticks = '<span class="ticks">✓</span>'; // single tick
+          }
+        }
+
+        // Show media if message_type is media and media_url exists
+        let contentHTML = "";
+        if (m.message_type && m.message_type !== "text" && m.media_url) {
+          // For simplicity, show image if media_url ends with image extension
+          if (/\.(jpg|jpeg|png|gif|webp)$/i.test(m.media_url)) {
+            contentHTML = `<img src="${escapeHTML(m.media_url)}" alt="media" style="max-width:100%; border-radius:8px;" />`;
+          } else {
+            contentHTML = `<a href="${escapeHTML(m.media_url)}" target="_blank" style="color:#00bfff;">Media file</a>`;
+          }
+        } else {
+          contentHTML = escapeHTML(m.body);
+        }
+
+        div.innerHTML = `
+          <div>${contentHTML}</div>
+          <div class="timestamp">${formatTime(m.created_at)} ${ticks}</div>
+        `;
+        div.dataset.id = m.id;
+        div.oncontextmenu = (e) => {
+          e.preventDefault();
+          selectedMsg = m;
+          showContextMenu(e.pageX, e.pageY);
+        };
+        chatBox.appendChild(div);
+      });
+
+      scrollToBottom();
+    }
+
+    // Mark messages as seen
+    async function markSeen() {
+      await supabase
+        .from("messages")
+        .update({ seen_at: new Date().toISOString() })
+        .eq("receiver_id", sessionUser.id)
+        .eq("sender_id", contactId)
+        .is("seen_at", null);
+    }
+
+    // Mark messages as delivered
+    async function markDelivered() {
+      await supabase
+        .from("messages")
+        .update({ delivered: true })
+        .eq("receiver_id", sessionUser.id)
+        .eq("sender_id", contactId)
+        .eq("delivered", false);
+    }
+
+    // Send message form handler
+    document.getElementById("chatForm").addEventListener("submit", async (e) => {
+      e.preventDefault();
+      const msgInput = document.getElementById("msgInput");
+      const msg = msgInput.value.trim();
+      if (!msg) return;
+      await supabase.from("messages").insert({
+        sender_id: sessionUser.id,
+        receiver_id: contactId,
+        body: msg,
+        message_type: "text"
+      });
+      msgInput.value = "";
+      await loadMessages();
+    });
+
+    // Realtime subscription for new messages
+    function subscribeRealtime() {
+      supabase
+        .channel("chat")
+        .on("postgres_changes", { event: "INSERT", schema: "public", table: "messages" }, async payload => {
+          const m = payload.new;
+          if ((m.sender_id === sessionUser.id && m.receiver_id === contactId) ||
+              (m.sender_id === contactId && m.receiver_id === sessionUser.id)) {
+            await markDelivered();
+            await markSeen();
+            await loadMessages();
+          }
+        }).subscribe();
+    }
+
+    // Context Menu Functions
+    const contextMenu = document.getElementById("contextMenu");
+    function showContextMenu(x, y) {
+      contextMenu.style.left = x + "px";
+      contextMenu.style.top = y + "px";
+      contextMenu.style.display = "block";
+    }
+    function hideContextMenu() {
+      contextMenu.style.display = "none";
+    }
+    window.onclick = hideContextMenu;
+
+    function deleteMsg() {
+      if (selectedMsg) {
+        const el = document.querySelector(`[data-id="${selectedMsg.id}"]`);
+        if (el) el.remove(); // frontend only
+      }
+      hideContextMenu();
+    }
+    function editMsg() {
+      if (selectedMsg) {
+        const newText = prompt("Edit message:", selectedMsg.body);
+        if (newText) {
+          const el = document.querySelector(`[data-id="${selectedMsg.id}"]`);
+          if (el) {
+            el.querySelector("div").textContent = newText + " (edited)";
+          }
+        }
+      }
+      hideContextMenu();
+    }
+    function infoMsg() {
+      if (selectedMsg) {
+        alert("Sent at: " + formatTime(selectedMsg.created_at));
+      }
+      hideContextMenu();
+    }
+
+    // Open View Contact modal and load data
+    async function openViewContactModal() {
+      viewContactModal.style.display = "flex";
+    }
+
+    // Set block status in DB
+    async function setBlockStatus(blocked) {
+      try {
+        // Update contacts table blocked flag
+        const { error } = await supabase
+          .from("contacts")
+          .update({ blocked })
+          .eq("owner_id", sessionUser.id)
+          .eq("contact_id", contactId);
+        if (error) throw error;
+
+        alert(blocked ? "User blocked" : "User unblocked");
+      } catch (err) {
+        alert("Failed to update block status: " + err.message);
+      }
+    }
+
+    // Report user function
+    async function reportUser(reason) {
+      try {
+        const { error } = await supabase
+          .from("reports")
+          .insert([{ reporter_id: sessionUser.id, reported_id: contactId, reason }]);
+        if (error) throw error;
+        alert("User reported. Thank you.");
+      } catch (err) {
+        alert("Failed to report user: " + err.message);
+      }
+    }
+
+    (async () => {
+      await getSession();
+      await loadMessages();
+      await markSeen();
+      subscribeRealtime();
+    })();
+
+  </script>
+</body>
+</html>
