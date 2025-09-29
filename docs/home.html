@@ -1,0 +1,470 @@
+<!DOCTYPE html>
+<html lang="en" >
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Telesapp - Contacts</title>
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;600&display=swap');
+
+    body {
+      margin: 0;
+      font-family: 'Inter', Arial, sans-serif;
+      background: #121212;
+      color: #ccc;
+      height: 100vh;
+      display: flex;
+      flex-direction: column;
+      -webkit-font-smoothing: antialiased;
+      -moz-osx-font-smoothing: grayscale;
+    }
+    header {
+      background: #1f1f1f;
+      padding: 12px 20px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      box-shadow: 0 2px 6px rgb(0 0 0 / 0.5);
+      position: sticky;
+      top: 0;
+      z-index: 10;
+    }
+    header .logo {
+      font-weight: 700;
+      color: #00bfff;
+      font-size: 1.4rem;
+      letter-spacing: 1px;
+      user-select: none;
+    }
+    header .menu {
+      font-size: 24px;
+      cursor: pointer;
+      color: #00bfff;
+      user-select: none;
+    }
+
+    /* Search box container */
+    #searchContainer {
+      background: #1f1f1f;
+      padding: 10px 20px;
+      border-bottom: 1px solid #2a2a2a;
+      position: sticky;
+      top: 56px;
+      z-index: 9;
+    }
+    #searchInput {
+      width: 100%;
+      padding: 10px 16px;
+      border-radius: 30px;
+      border: none;
+      font-size: 16px;
+      background: #2a2a2a;
+      color: #eee;
+      box-shadow: inset 0 0 6px rgb(0 0 0 / 0.8);
+      transition: background-color 0.3s ease;
+      outline-offset: 2px;
+    }
+    #searchInput::placeholder {
+      color: #888;
+      font-style: italic;
+    }
+    #searchInput:focus {
+      background: #363636;
+      box-shadow: 0 0 8px #00bfff;
+      outline: none;
+    }
+
+    main {
+      flex: 1;
+      overflow-y: auto;
+      background: #121212;
+      padding: 0 0 80px 0;
+    }
+
+    .contact {
+      display: flex;
+      align-items: center;
+      padding: 12px 20px;
+      background: #1f1f1f;
+      margin: 8px 20px;
+      border-radius: 12px;
+      cursor: pointer;
+      transition: background-color 0.25s ease;
+      box-shadow: 0 1px 3px rgb(0 0 0 / 0.6);
+    }
+    .contact:hover {
+      background: #2a2a2a;
+      box-shadow: 0 4px 8px rgb(0 191 255 / 0.3);
+    }
+    .contact img.avatar {
+      width: 56px;
+      height: 56px;
+      border-radius: 50%;
+      object-fit: cover;
+      margin-right: 14px;
+      flex-shrink: 0;
+      background: #444;
+    }
+    .contact .info {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+    }
+    .contact .info .name {
+      font-weight: 600;
+      font-size: 1.1rem;
+      color: #00bfff;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+    .contact .info .last-message {
+      font-size: 0.9rem;
+      color: #aaa;
+      margin-top: 4px;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+    .contact .time {
+      font-size: 0.8rem;
+      color: #666;
+      margin-left: 12px;
+      white-space: nowrap;
+      flex-shrink: 0;
+    }
+
+    .no-contacts {
+      text-align: center;
+      color: #666;
+      margin-top: 50px;
+      font-style: italic;
+      user-select: none;
+    }
+
+    .floating-btn {
+      position: fixed;
+      bottom: 75px;
+      right: 25px;
+      background: #e53935;
+      color: #fff;
+      border-radius: 50%;
+      width: 56px;
+      height: 56px;
+      font-size: 36px;
+      line-height: 56px;
+      text-align: center;
+      cursor: pointer;
+      box-shadow: 0 4px 12px rgb(229 57 53 / 0.6);
+      user-select: none;
+      transition: background-color 0.3s ease;
+      z-index: 20;
+    }
+    .floating-btn:hover {
+      background: #d32f2f;
+      box-shadow: 0 6px 18px rgb(211 47 47 / 0.8);
+    }
+
+    footer {
+      background: #1f1f1f;
+      padding: 12px 20px;
+      text-align: center;
+      color: #00bfff;
+      font-weight: 600;
+      user-select: none;
+      box-shadow: 0 -2px 6px rgb(0 0 0 / 0.5);
+    }
+  </style>
+</head>
+<body>
+  <header>
+    <div class="logo">Telesapp</div>
+    <div class="menu" title="Menu">⋮</div>
+  </header>
+
+  <div id="searchContainer">
+    <input
+      id="searchInput"
+      type="search"
+      placeholder="Search contacts..."
+      autocomplete="off"
+      spellcheck="false"
+      aria-label="Search contacts"
+    />
+  </div>
+
+  <main id="contactsList">
+    <p class="no-contacts">No contacts yet. Add one with +</p>
+  </main>
+
+  <div class="floating-btn" title="Add Contact" onclick="newContact()">+</div>
+
+  <footer id="userFooter">Loading...</footer>
+
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script>
+    const supabase = window.supabase.createClient(
+      "https://tbbjcxahtnojcuxwevkm.supabase.co",
+      "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InRiYmpjeGFodG5vamN1eHdldmttIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTg5ODA0MjMsImV4cCI6MjA3NDU1NjQyM30.mNp1Jj7PNiGXNC1WJDGaaUpJW2C0P7AqnLt3DlGhxqs"
+    );
+
+    let sessionUser = null;
+    let contactsData = [];
+
+    // Format timestamp nicely
+    function formatTimestamp(ts) {
+      if (!ts) return "";
+      const date = new Date(ts);
+      const now = new Date();
+      const diffMs = now - date;
+      const diffDays = Math.floor(diffMs / (1000 * 60 * 60 * 24));
+
+      if (diffDays === 0) {
+        // Show time e.g. 4:47 am
+        return date.toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit', hour12: true }).toLowerCase();
+      }
+      if (diffDays === 1) return "Yesterday";
+      if (diffDays < 7) return date.toLocaleDateString(undefined, { weekday: 'short' });
+      // Else date short
+      return date.toLocaleDateString();
+    }
+
+    // Escape HTML to avoid XSS
+    function escapeHTML(str) {
+      if (!str) return "";
+      return str.replace(/[&<>"']/g, (m) => ({
+        '&': '&amp;',
+        '<': '&lt;',
+        '>': '&gt;',
+        '"': '&quot;',
+        "'": '&#39;'
+      })[m]);
+    }
+
+    function renderContacts(list) {
+      const container = document.getElementById("contactsList");
+      container.innerHTML = "";
+
+      if (list.length === 0) {
+        container.innerHTML = `<p class="no-contacts">No contacts found.</p>`;
+        return;
+      }
+
+      list.forEach(c => {
+        const div = document.createElement("div");
+        div.className = "contact";
+        div.onclick = () => window.location.href = `chat.html?contactId=${c.contact_id}`;
+
+        // Avatar fallback
+        const avatarUrl = c.avatar_url || "https://cdn-icons-png.flaticon.com/512/149/149071.png";
+
+        div.innerHTML = `
+          <img class="avatar" src="${avatarUrl}" alt="Avatar of ${escapeHTML(c.full_name)}" loading="lazy" />
+          <div class="info">
+            <div class="name">${escapeHTML(c.full_name)}</div>
+            <div class="last-message">${escapeHTML(c.last_message || "")}</div>
+          </div>
+          <div class="time">${formatTimestamp(c.last_message_at)}</div>
+        `;
+
+        container.appendChild(div);
+      });
+    }
+
+    async function getSession() {
+      const { data: { session } } = await supabase.auth.getSession();
+      sessionUser = session?.user;
+      if (!sessionUser) window.location.href = "login.html";
+
+      // Load current user profile for footer
+      const { data: profile } = await supabase.from("profiles").select("full_name").eq("id", sessionUser.id).single();
+      document.getElementById("userFooter").textContent = `Telesapp - ${profile?.full_name || "You"}`;
+    }
+
+    // Load contacts with profile info + last message + avatar
+    async function loadContacts() {
+      // Get contacts with profile info
+      const { data: contacts, error } = await supabase
+        .from("contacts")
+        .select(`
+          contact_id,
+          profiles:contact_id (
+            full_name,
+            avatar_url
+          )
+        `)
+        .eq("owner_id", sessionUser.id);
+
+      if (error) {
+        console.error("Error loading contacts:", error);
+        return;
+      }
+      if (!contacts || contacts.length === 0) {
+        renderContacts([]);
+        return;
+      }
+
+      // For each contact, get last message between sessionUser and contact
+      const contactIds = contacts.map(c => c.contact_id);
+
+      // Query last messages for all contacts in one go:
+      // We get messages where (sender = user AND receiver = contact) OR (sender = contact AND receiver = user)
+      // Then group by contact and find latest message per contact
+      const { data: messages, error: msgErr } = await supabase.rpc('get_last_messages_for_contacts', {
+        user_id := sessionUser.id,
+        contact_ids := contactIds
+      });
+
+      if (msgErr) {
+        console.error("Error loading last messages:", msgErr);
+      }
+
+      // Map last messages by contact_id
+      const lastMessagesMap = {};
+      if (messages && messages.length) {
+        messages.forEach(m => {
+          // Determine the other user id for this message thread
+          const otherId = m.sender_id === sessionUser.id ? m.receiver_id : m.sender_id;
+          const prev = lastMessagesMap[otherId];
+          if (!prev || new Date(m.created_at) > new Date(prev.created_at)) {
+            lastMessagesMap[otherId] = m;
+          }
+        });
+      }
+
+      // Build contacts data for UI
+      contactsData = contacts.map(c => {
+        const profile = c.profiles || {};
+        const lastMsg = lastMessagesMap[c.contact_id];
+        return {
+          contact_id: c.contact_id,
+          full_name: profile.full_name || "Unnamed User",
+          avatar_url: profile.avatar_url,
+          last_message: lastMsg ? lastMsg.body : "",
+          last_message_at: lastMsg ? lastMsg.created_at : null
+        };
+      });
+
+      renderContacts(contactsData);
+    }
+
+    // Search contacts by name or last message
+    function filterContacts(query) {
+      if (!query) {
+        renderContacts(contactsData);
+        return;
+      }
+      query = query.toLowerCase();
+      const filtered = contactsData.filter(c =>
+        c.full_name.toLowerCase().includes(query) ||
+        (c.last_message && c.last_message.toLowerCase().includes(query))
+      );
+      renderContacts(filtered);
+    }
+
+    async function newContact() {
+      const email = prompt("Enter user email:");
+      if (!email) return;
+
+      // find user by email
+      const { data: profile } = await supabase.from("profiles").select("id, full_name, avatar_url").eq("email", email).single();
+      if (!profile) {
+        alert("User not in Telesapp.");
+        return;
+      }
+
+      // check if already added
+      const { data: existing } = await supabase.from("contacts").select().eq("owner_id", sessionUser.id).eq("contact_id", profile.id).single();
+      if (existing) {
+        alert("Contact already added.");
+        return;
+      }
+
+      // insert into contacts
+      const { error } = await supabase.from("contacts").insert({
+        owner_id: sessionUser.id,
+        contact_id: profile.id
+      });
+      if (error) {
+        alert("Failed to add contact.");
+        console.error(error);
+        return;
+      }
+
+      await loadContacts();
+    }
+
+    // Setup search input listener
+    function setupSearch() {
+      const input = document.getElementById("searchInput");
+      input.addEventListener("input", e => filterContacts(e.target.value));
+    }
+
+    // RPC function fallback if your DB does not have get_last_messages_for_contacts
+    // We'll do a simpler fallback querying messages one by one (less efficient)
+    async function loadContactsFallback() {
+      const { data: contacts, error } = await supabase
+        .from("contacts")
+        .select(`
+          contact_id,
+          profiles:contact_id (
+            full_name,
+            avatar_url
+          )
+        `)
+        .eq("owner_id", sessionUser.id);
+
+      if (error) {
+        console.error("Error loading contacts:", error);
+        return;
+      }
+      if (!contacts || contacts.length === 0) {
+        renderContacts([]);
+        return;
+      }
+
+      let contactsWithLastMsg = [];
+      for (const c of contacts) {
+        const profile = c.profiles || {};
+        // Get last message between sessionUser and this contact
+        const { data: msgs, error: msgErr } = await supabase
+          .from("messages")
+          .select("*")
+          .or(`and(sender_id.eq.${sessionUser.id},receiver_id.eq.${c.contact_id}),and(sender_id.eq.${c.contact_id},receiver_id.eq.${sessionUser.id})`)
+          .order("created_at", { ascending: false })
+          .limit(1);
+
+        if (msgErr) {
+          console.error("Error loading last message for contact", c.contact_id, msgErr);
+        }
+        const lastMsg = msgs && msgs.length > 0 ? msgs[0] : null;
+
+        contactsWithLastMsg.push({
+          contact_id: c.contact_id,
+          full_name: profile.full_name || "Unnamed User",
+          avatar_url: profile.avatar_url,
+          last_message: lastMsg ? lastMsg.body : "",
+          last_message_at: lastMsg ? lastMsg.created_at : null
+        });
+      }
+      contactsData = contactsWithLastMsg;
+      renderContacts(contactsData);
+    }
+
+    (async () => {
+      await getSession();
+
+      // Try to load contacts with RPC for efficiency, fallback if error
+      try {
+        await loadContacts();
+      } catch {
+        await loadContactsFallback();
+      }
+
+      setupSearch();
+    })();
+  </script>
+</body>
+  </html>
+  
