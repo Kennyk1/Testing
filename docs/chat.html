@@ -1,0 +1,167 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Telesapp - Chat</title>
+  <style>
+    body { margin:0; font-family:Arial, sans-serif; background:#121212; color:#ccc; height:100vh; display:flex; flex-direction:column; }
+    header { background:#1f1f1f; padding:12px; display:flex; align-items:center; gap:10px; }
+    header img { width:36px; height:36px; border-radius:50%; object-fit:cover; }
+    header .title { flex:1; font-weight:bold; color:#00bfff; text-align:left; }
+    header .actions { display:flex; gap:12px; color:#00bfff; font-size:18px; cursor:pointer; }
+    main { flex:1; padding:10px; overflow-y:auto; display:flex; flex-direction:column; }
+    .msg-row { display:flex; align-items:flex-end; margin:6px 0; }
+    .msg { padding:10px; border-radius:10px; max-width:70%; position:relative; font-size:14px; }
+    .sent { background:#00bfff; color:#fff; margin-left:auto; border-bottom-right-radius:2px; }
+    .recv { background:#2a2a2a; margin-right:auto; border-bottom-left-radius:2px; }
+    .timestamp { font-size:10px; opacity:0.7; margin-left:6px; display:inline-block; }
+    .ticks { font-size:12px; margin-left:4px; }
+    .ticks.seen { color:#00bfff; } /* blue ticks */
+    form { display:flex; padding:10px; background:#1f1f1f; gap:8px; }
+    input { flex:1; padding:10px; border:none; border-radius:6px; background:#2a2a2a; color:#fff; }
+    button { padding:10px 15px; border:none; background:#00bfff; color:#fff; border-radius:6px; cursor:pointer; }
+  </style>
+</head>
+<body>
+  <header>
+    <img id="chatAvatar" src="https://via.placeholder.com/150" alt="Avatar">
+    <div class="title" id="chatTitle">Chat</div>
+    <div class="actions">
+      <span title="Voice Call">📞</span>
+      <span title="Video Call">🎥</span>
+    </div>
+  </header>
+  <main id="chatBox"></main>
+  <form id="chatForm">
+    <input id="msgInput" placeholder="Type a message..." required />
+    <button>Send</button>
+  </form>
+
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script>
+    const supabase = window.supabase.createClient(
+      "https://tbbjcxahtnojcuxwevkm.supabase.co",
+      "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InRiYmpjeGFodG5vamN1eHdldmttIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTg5ODA0MjMsImV4cCI6MjA3NDU1NjQyM30.mNp1Jj7PNiGXNC1WJDGaaUpJW2C0P7AqnLt3DlGhxqs"
+    );
+
+    let sessionUser = null;
+    const params = new URLSearchParams(window.location.search);
+    const contactId = params.get("contactId");
+
+    async function getSession() {
+      const { data: { session } } = await supabase.auth.getSession();
+      sessionUser = session?.user;
+      if (!sessionUser) window.location.href = "login.html";
+
+      // Load contact name + avatar
+      const { data: profile } = await supabase
+        .from("profiles")
+        .select("full_name, avatar_url")
+        .eq("id", contactId)
+        .single();
+
+      document.getElementById("chatTitle").textContent = profile?.full_name || "Chat";
+      if (profile?.avatar_url) {
+        document.getElementById("chatAvatar").src = profile.avatar_url;
+      }
+    }
+
+    async function loadMessages() {
+      const { data } = await supabase
+        .from("messages")
+        .select("*")
+        .or(`and(sender_id.eq.${sessionUser.id},receiver_id.eq.${contactId}),and(sender_id.eq.${contactId},receiver_id.eq.${sessionUser.id})`)
+        .order("created_at", { ascending: true });
+
+      const box = document.getElementById("chatBox");
+      box.innerHTML = "";
+      data.forEach(m => renderMessage(m));
+      box.scrollTop = box.scrollHeight;
+
+      // mark delivered + seen for this chat
+      await markDelivered();
+      await markSeen();
+    }
+
+    function renderMessage(m) {
+      const div = document.createElement("div");
+      div.className = "msg-row";
+      const bubble = document.createElement("div");
+      bubble.className = "msg " + (m.sender_id === sessionUser.id ? "sent" : "recv");
+      bubble.textContent = m.body;
+
+      const meta = document.createElement("div");
+      meta.className = "timestamp";
+      const time = new Date(m.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+
+      let ticks = "";
+      if (m.sender_id === sessionUser.id) {
+        if (m.seen_at) ticks = '<span class="ticks seen">✓✓</span>';
+        else if (m.delivered) ticks = '<span class="ticks">✓✓</span>';
+        else ticks = '<span class="ticks">✓</span>';
+      }
+      meta.innerHTML = `${time} ${ticks}`;
+
+      bubble.appendChild(meta);
+      div.appendChild(bubble);
+      document.getElementById("chatBox").appendChild(div);
+    }
+
+    document.getElementById("chatForm").addEventListener("submit", async (e) => {
+      e.preventDefault();
+      const msg = document.getElementById("msgInput").value.trim();
+      if (!msg) return;
+      await supabase.from("messages").insert({
+        sender_id: sessionUser.id,
+        receiver_id: contactId,
+        body: msg,
+        delivered: false,
+        seen_at: null
+      });
+      document.getElementById("msgInput").value = "";
+    });
+
+    async function markDelivered() {
+      await supabase
+        .from("messages")
+        .update({ delivered: true })
+        .eq("receiver_id", sessionUser.id)
+        .eq("sender_id", contactId)
+        .eq("delivered", false);
+    }
+
+    async function markSeen() {
+      await supabase
+        .from("messages")
+        .update({ seen_at: new Date().toISOString() })
+        .eq("receiver_id", sessionUser.id)
+        .eq("sender_id", contactId)
+        .is("seen_at", null);
+    }
+
+    function subscribeRealtime() {
+      supabase
+        .channel("chat")
+        .on("postgres_changes", { event: "INSERT", schema: "public", table: "messages" }, payload => {
+          const m = payload.new;
+          if ((m.sender_id === sessionUser.id && m.receiver_id === contactId) ||
+              (m.sender_id === contactId && m.receiver_id === sessionUser.id)) {
+            renderMessage(m);
+            document.getElementById("chatBox").scrollTop = document.getElementById("chatBox").scrollHeight;
+            if (m.receiver_id === sessionUser.id) {
+              markDelivered();
+              markSeen();
+            }
+          }
+        }).subscribe();
+    }
+
+    (async () => {
+      await getSession();
+      await loadMessages();
+      subscribeRealtime();
+    })();
+  </script>
+</body>
+</html>
