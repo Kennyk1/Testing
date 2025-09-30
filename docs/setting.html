@@ -1,0 +1,159 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Settings</title>
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      background: #f9f9f9;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      min-height: 100vh;
+      margin: 0;
+    }
+    .settings-container {
+      background: white;
+      padding: 2rem;
+      border-radius: 12px;
+      box-shadow: 0 6px 16px rgba(0, 0, 0, 0.1);
+      max-width: 400px;
+      width: 100%;
+    }
+    h2 {
+      text-align: center;
+      margin-bottom: 1rem;
+    }
+    .form-group {
+      margin-bottom: 1rem;
+    }
+    label {
+      display: block;
+      margin-bottom: 0.5rem;
+      font-weight: bold;
+    }
+    input, textarea {
+      width: 100%;
+      padding: 0.6rem;
+      border: 1px solid #ddd;
+      border-radius: 8px;
+      font-size: 1rem;
+    }
+    button {
+      background: #4a90e2;
+      color: white;
+      border: none;
+      padding: 0.8rem;
+      width: 100%;
+      border-radius: 8px;
+      cursor: pointer;
+      font-size: 1rem;
+    }
+    button:hover {
+      background: #357ab8;
+    }
+    .logout {
+      margin-top: 1rem;
+      background: #e94e4e;
+    }
+    .logout:hover {
+      background: #c73a3a;
+    }
+    .status {
+      text-align: center;
+      margin-top: 1rem;
+      color: green;
+      font-size: 0.9rem;
+    }
+  </style>
+</head>
+<body>
+  <div class="settings-container">
+    <h2>Profile Settings</h2>
+    <form id="settings-form">
+      <div class="form-group">
+        <label for="full_name">Full Name</label>
+        <input type="text" id="full_name" />
+      </div>
+      <div class="form-group">
+        <label for="bio">Bio</label>
+        <textarea id="bio" rows="3"></textarea>
+      </div>
+      <div class="form-group">
+        <label for="avatar_url">Avatar URL</label>
+        <input type="url" id="avatar_url" />
+      </div>
+      <button type="submit">Save Changes</button>
+    </form>
+    <button class="logout" id="logout-btn">Logout</button>
+    <div class="status" id="status"></div>
+  </div>
+
+  <script>
+    // 🔑 Replace with your Supabase credentials
+    const SUPABASE_URL = "https://YOUR-PROJECT.supabase.co";
+    const SUPABASE_ANON_KEY = "YOUR-ANON-KEY";
+
+    const supabase = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+
+    // ✅ Check authentication immediately
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      if (!session) {
+        window.location.href = "login.html"; // redirect instantly if not logged in
+      } else {
+        loadProfile(session.user.id);
+      }
+    });
+
+    async function loadProfile(userId) {
+      const { data, error } = await supabase
+        .from("profiles")
+        .select("full_name, bio, avatar_url")
+        .eq("id", userId)
+        .single();
+
+      if (error) {
+        console.error(error);
+        return;
+      }
+
+      document.getElementById("full_name").value = data.full_name || "";
+      document.getElementById("bio").value = data.bio || "";
+      document.getElementById("avatar_url").value = data.avatar_url || "";
+    }
+
+    // ✅ Update profile
+    document.getElementById("settings-form").addEventListener("submit", async (e) => {
+      e.preventDefault();
+      const { data: { user } } = await supabase.auth.getUser();
+
+      const updates = {
+        id: user.id,
+        full_name: document.getElementById("full_name").value,
+        bio: document.getElementById("bio").value,
+        avatar_url: document.getElementById("avatar_url").value,
+      };
+
+      const { error } = await supabase.from("profiles").upsert(updates);
+
+      const statusEl = document.getElementById("status");
+      if (error) {
+        statusEl.textContent = "❌ Error saving changes.";
+        statusEl.style.color = "red";
+      } else {
+        statusEl.textContent = "✅ Changes saved successfully.";
+        statusEl.style.color = "green";
+      }
+    });
+
+    // ✅ Logout
+    document.getElementById("logout-btn").addEventListener("click", async () => {
+      await supabase.auth.signOut();
+      window.location.href = "login.html";
+    });
+  </script>
+</body>
+</html>
