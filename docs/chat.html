@@ -1,0 +1,222 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Telesapp - Chat</title>
+  <style>
+    body {
+      margin:0; font-family:Arial, sans-serif;
+      background:#0b141a; color:#e9edef;
+      height:100vh; display:flex; flex-direction:column;
+    }
+    header {
+      background:#202c33; padding:10px;
+      display:flex; align-items:center; justify-content:space-between;
+      color:#fff; position:sticky; top:0; z-index:10;
+    }
+    .chat-info { display:flex; align-items:center; cursor:pointer; }
+    .chat-info img {
+      width:40px; height:40px; border-radius:50%; margin-right:10px;
+    }
+    .chat-info .name { font-weight:bold; font-size:16px; }
+    .chat-actions button {
+      background:none; border:none; color:#00bfff;
+      font-size:18px; margin-left:10px; cursor:pointer;
+    }
+    main {
+      flex:1; padding:10px; overflow-y:auto;
+      background:url("https://h.uguu.se/oZZLcuTZ.jpg");
+    }
+    .msg {
+      margin:6px 0; padding:8px 10px;
+      border-radius:8px; max-width:75%; position:relative;
+      word-wrap:break-word; font-size:14px;
+    }
+    .sent { background:#005c4b; color:#fff; margin-left:auto; border-bottom-right-radius:0; }
+    .recv { background:#202c33; color:#fff; margin-right:auto; border-bottom-left-radius:0; }
+    .timestamp { font-size:11px; opacity:0.7; margin-top:4px; text-align:right; }
+    form { display:flex; padding:10px; background:#202c33; }
+    input {
+      flex:1; padding:10px; border:none; border-radius:20px;
+      margin-right:8px; background:#2a3942; color:#fff;
+    }
+    button {
+      padding:10px 15px; border:none;
+      background:#00bfff; color:#fff; border-radius:50%;
+      font-size:16px; cursor:pointer;
+    }
+    /* Profile Panel */
+    #profilePanel {
+      position:absolute; top:0; left:100%; width:100%; height:100%;
+      background:#111b21; transition:all 0.3s ease-in-out;
+      display:flex; flex-direction:column; overflow-y:auto;
+    }
+    #profilePanel.active { left:0; }
+    #profileHeader {
+      background:#202c33; padding:10px;
+      display:flex; align-items:center; justify-content:space-between;
+    }
+    #profileHeader button {
+      background:none; border:none; color:#00bfff; font-size:16px; cursor:pointer;
+    }
+    #profileContent { padding:20px; text-align:center; }
+    #profileContent img {
+      width:80px; height:80px; border-radius:50%; margin-bottom:10px;
+    }
+    #profileContent h2 { margin:10px 0 5px; }
+    #profileContent p { opacity:0.8; margin:4px 0; }
+    .profile-actions { margin-top:20px; display:flex; flex-direction:column; gap:10px; }
+    .profile-actions button {
+      padding:10px; border:none; border-radius:8px;
+      background:#2a3942; color:#fff; font-size:14px; cursor:pointer;
+    }
+    .profile-actions button:hover { background:#3b4a54; }
+    /* Context menu */
+    #contextMenu {
+      position:absolute; display:none; background:#2a3942;
+      border-radius:6px; overflow:hidden; box-shadow:0 2px 6px rgba(0,0,0,0.3);
+      z-index:1000;
+    }
+    #contextMenu div { padding:10px 15px; cursor:pointer; }
+    #contextMenu div:hover { background:#3b4a54; }
+    .ticks { margin-left:6px; font-weight:bold; color:gray; }
+    .ticks.seen { color:#00aaff; }
+  </style>
+</head>
+<body>
+  <header id="chatHeader">
+    <div class="chat-info" id="chatInfo">
+      <img id="chatAvatar" src="https://h.uguu.se/oZZLcuTZ.jpg" alt="avatar">
+      <div class="name" id="chatTitle">Chat</div>
+    </div>
+    <div class="chat-actions">
+      <button title="Voice Call">📞</button>
+      <button title="Video Call">📹</button>
+    </div>
+  </header>
+
+  <main id="chatBox"></main>
+
+  <form id="chatForm">
+    <input id="msgInput" placeholder="Type a message..." required />
+    <button>➤</button>
+  </form>
+
+  <div id="profilePanel">
+    <div id="profileHeader">
+      <button onclick="closeProfile()">← Back</button>
+      <div>Profile</div>
+      <div></div>
+    </div>
+    <div id="profileContent"></div>
+  </div>
+
+  <div id="contextMenu">
+    <div onclick="deleteMsg()">Delete</div>
+    <div onclick="editMsg()">Edit</div>
+    <div onclick="infoMsg()">Info</div>
+  </div>
+
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script>
+    const supabaseClient = window.supabase.createClient(
+      "https://tbbjcxahtnojcuxwevkm.supabase.co",
+      "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InRiYmpjeGFodG5vamN1eHdldmttIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTg5ODA0MjMsImV4cCI6MjA3NDU1NjQyM30.mNp1Jj7PNiGXNC1WJDGaaUpJW2C0P7AqnLt3DlGhxqs"
+    );
+
+    let sessionUser = null;
+    let contactProfile = null;
+    const params = new URLSearchParams(window.location.search);
+    const contactId = params.get("contactId");
+
+    async function getSession() {
+      const { data: { session } } = await supabaseClient.auth.getSession();
+      sessionUser = session?.user;
+      if (!sessionUser) window.location.href = "login.html";
+
+      // Load contact info
+      const { data: profile } = await supabaseClient
+        .from("profiles")
+        .select("id, full_name, username, avatar_url, bio, status")
+        .eq("id", contactId)
+        .single();
+
+      contactProfile = profile;
+      document.getElementById("chatTitle").textContent = profile?.full_name || "Chat";
+      if (profile?.avatar_url) document.getElementById("chatAvatar").src = profile.avatar_url;
+    }
+
+    function openProfile() {
+      if (!contactProfile) return;
+      document.getElementById("profileContent").innerHTML = `
+        <img src="${contactProfile.avatar_url || 'https://via.placeholder.com/80'}">
+        <h2>${contactProfile.full_name || "Unknown"}</h2>
+        <p>@${contactProfile.username || ""}</p>
+        <p>${contactProfile.bio || ""}</p>
+        <p>Status: ${contactProfile.status || "Available"}</p>
+        <div class="profile-actions">
+          <button onclick="startChat()">Message</button>
+          <button onclick="blockUser()">Block</button>
+        </div>
+      `;
+      document.getElementById("profilePanel").classList.add("active");
+    }
+    function closeProfile() {
+      document.getElementById("profilePanel").classList.remove("active");
+    }
+    function startChat() {
+      closeProfile();
+      alert("Start chat with " + contactProfile.full_name);
+    }
+    function blockUser() {
+      alert("User blocked: " + contactProfile.full_name);
+    }
+
+    document.getElementById("chatInfo").addEventListener("click", openProfile);
+
+    // --- existing chat code (load messages, send, realtime etc.) ---
+    function escapeHTML(str) {
+      return str.replace(/[&<>'"]/g, tag =>
+        ({ '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;' }[tag])
+      );
+    }
+    function formatTime(ts) {
+      const d = new Date(ts);
+      return d.toLocaleTimeString([], {hour:"2-digit", minute:"2-digit"});
+    }
+    async function loadMessages() {
+      const { data } = await supabaseClient
+        .from("messages")
+        .select("*")
+        .or(`and(sender_id.eq.${sessionUser.id},receiver_id.eq.${contactId}),and(sender_id.eq.${contactId},receiver_id.eq.${sessionUser.id})`)
+        .order("created_at", { ascending: true });
+
+      const box = document.getElementById("chatBox");
+      box.innerHTML = "";
+
+      data.forEach(m => {
+        const div = document.createElement("div");
+        div.className = "msg " + (m.sender_id === sessionUser.id ? "sent" : "recv");
+        let ticks = "";
+        if (m.sender_id === sessionUser.id) {
+          if (m.seen_at) ticks = '<span class="ticks seen">✓✓</span>';
+          else if (m.delivered) ticks = '<span class="ticks">✓✓</span>';
+          else ticks = '<span class="ticks">✓</span>';
+        }
+        div.innerHTML = `
+          <div>${escapeHTML(m.body)}</div>
+          <div class="timestamp">${formatTime(m.created_at)} ${ticks}</div>
+        `;
+        box.appendChild(div);
+      });
+      box.scrollTop = box.scrollHeight;
+    }
+
+    (async () => {
+      await getSession();
+      await loadMessages();
+    })();
+  </script>
+</body>
+</html>
