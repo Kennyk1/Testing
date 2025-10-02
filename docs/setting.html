@@ -505,4 +505,103 @@
         const { error } = await supabase.from('notification_settings').upsert(updates);
         if (error) {
           console.error('saveNotifications error', error);
-          return showToast('Failed to
+          return showToast('Failed to save notifications: ' + (error.message || error));
+        }
+        showToast('Notifications saved');
+      } catch (err) {
+        console.error(err);
+        showToast('Error saving notifications: ' + err.message);
+      }
+    }
+
+    // ========== Blocked users ==========
+    async function loadBlockedUsers() {
+      try {
+        const userId = _user.id;
+        const { data: blocked, error } = await supabase
+          .from('blocked_users')
+          .select('blocked_id')
+          .eq('blocker_id', userId);
+
+        if (error) {
+          console.warn('blocked load', error);
+          return;
+        }
+        const ids = blocked?.map(b => b.blocked_id) || [];
+        let profiles = [];
+        if (ids.length) {
+          const { data: p } = await supabase.from('profiles').select('id,full_name,avatar_url').in('id', ids);
+          profiles = p || [];
+        }
+
+        const list = document.getElementById('blockedList');
+        list.innerHTML = '';
+        if (!profiles.length) {
+          list.innerHTML = '<div class="muted-note">No blocked users</div>';
+          return;
+        }
+        profiles.forEach(pr => {
+          const li = document.createElement('li');
+          li.className = 'blocked-item';
+          li.innerHTML = `<div style="display:flex;align-items:center;gap:12px"><img src="${pr.avatar_url || 'https://cdn-icons-png.flaticon.com/512/149/149071.png'}" style="width:40px;height:40px;border-radius:50%;object-fit:cover"/><div><div style="font-weight:600">${pr.full_name || 'Unnamed'}</div><div class="small">${pr.id}</div></div></div>
+            <div><button class="btn grey" onclick='unblock("${pr.id}")'>Unblock</button></div>`;
+          list.appendChild(li);
+        });
+      } catch (err) {
+        console.error('loadBlockedUsers', err);
+      }
+    }
+
+    async function unblock(id) {
+      try {
+        const userId = _user.id;
+        const { error } = await supabase.from('blocked_users').delete()
+          .eq('blocker_id', userId)
+          .eq('blocked_id', id);
+        if (error) {
+          console.error('unblock error', error);
+          return showToast('Failed to unblock: ' + (error.message || error));
+        }
+        showToast('User unblocked');
+        await loadBlockedUsers();
+      } catch (err) {
+        console.error(err);
+      }
+    }
+
+    // ========== Delete Account (cautious) ==========
+    async function deleteAccount() {
+      if (!confirm('Delete account? This removes your profile row and signs you out. Auth user deletion requires server/service role. Continue?')) return;
+      try {
+        const userId = _user.id;
+        // delete profiles row (RLS must allow delete for owner)
+        const { error } = await supabase.from('profiles').delete().eq('id', userId);
+        if (error) {
+          console.error('delete profile error', error);
+          showToast('Failed to delete profile: ' + (error.message || error));
+          return;
+        }
+        showToast('Profile removed — signing out');
+        await supabase.auth.signOut();
+        window.location.href = 'signup.html';
+      } catch (err) {
+        console.error(err);
+        showToast('Error deleting account: ' + err.message);
+      }
+    }
+
+    // small helpers for clickable rows (username/links)
+    function openUsernameEditor() {
+      // scroll to username input
+      document.getElementById('username').scrollIntoView({behavior:'smooth',block:'center'});
+      document.getElementById('username').focus();
+    }
+    function openLinksEditor() {
+      showToast('Links editor placeholder (you can add a custom UI here)');
+    }
+
+    // init
+    init();
+  </script>
+</body>
+</html>
